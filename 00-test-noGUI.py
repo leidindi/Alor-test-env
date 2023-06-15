@@ -1,4 +1,10 @@
+import datetime
+
 from AlIonBatteryTestSoftware import TestController
+import threading
+import datetime as date
+from sqlalchemy import create_engine
+import pandas as pd
 class TestTypes:
     def __init__(self):
         self.testController = TestController()
@@ -6,18 +12,16 @@ class TestTypes:
     def runUPSTest(self, Charge_Volt_start: float, Charge_volt_end: float,
                    Charge_current_max: float, Charge_power_max: float, DCharge_volt_min: float,
                    DCharge_current_max: float, Slew_volt: float, Slew_current: float,
-                   LeadinTime: int, Charge_time: int, DCharge_time: int, numCycles: int):
-        import threading
+                   LeadinTime: int, Charge_time: int, DCharge_time: int, numCycles: int, Goal_voltage: float):
+
         self.testController.event.clear()
-        self.upsThread = threading.Thread(target=self.testController.NEWupsTest,
-                                          args=(Charge_Volt_start, Charge_volt_end,
+
+        return self.testController.NEWupsTest(Charge_Volt_start, Charge_volt_end,
                                                 Charge_current_max, Charge_power_max,
                                                 DCharge_volt_min, DCharge_current_max,
                                                 Slew_volt, Slew_current,
                                                 LeadinTime, Charge_time,
-                                                DCharge_time, numCycles))
-        self.upsThread.start()
-
+                                                DCharge_time, numCycles, Goal_voltage)
 def main():
     # sjá def og niðri
     TObj = TestTypes()  # initiating a TestObject:: TObj
@@ -56,7 +60,26 @@ def main():
 #                   Charge_current_max: float, Charge_power_max: float, DCharge_volt_min: float,
 #                   DCharge_current_max: float, Slew_volt: float, Slew_current: float,
 #                   LeadinTime: int, Charge_time: int, DCharge_time: int, numCycles: int):
-    TObj.runUPSTest(13.0, 13.1, 2.0, 9.9, 11.0, 0.02, 0.001, 0.001, 10, 20, 22, 2)
+
+    Base = 4.5
+    data = TObj.runUPSTest(Charge_Volt_start=Base, Charge_volt_end=16,
+                    Charge_current_max=2.0, Charge_power_max=9.9,
+                    DCharge_volt_min=Base-2, DCharge_current_max=0.05,
+                    Slew_volt=0.005, Slew_current=0.005,
+                    LeadinTime=5, Charge_time=10,
+                    DCharge_time=10, numCycles=1, Goal_voltage=8)
+
+    database = "Alor - DB"
+    user = "postgres"
+    password = "1234"
+    port = 5432
+    host = "localhost"
+
+    # Create a database connection
+    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
+
+    # Insert the DataFrame into the database table
+    data.to_sql('testdata', engine, if_exists='append', index=False)
 
 if __name__ == "__main__":
     main()
@@ -65,7 +88,7 @@ if __name__ == "__main__":
     ####################    ####################    ####################
     ##### CHARGING #####
     # Charging_Volt_start=1.2
-    # Charging_Volt_end=7.2
+    # Charging_Volt_end=7.2q
     # Charging_Current_max=0.4
     ##### DISCHARGING #####
     # Discharging_Volt_min= 1.2

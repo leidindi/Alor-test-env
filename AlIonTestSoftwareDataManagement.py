@@ -1,5 +1,6 @@
 import openpyxl
-from openpyxl.chart import ScatterChart,Reference, Series
+from openpyxl.chart import ScatterChart,Reference
+from openpyxl.chart import Series
 import datetime
 from math import floor
 import time
@@ -49,18 +50,9 @@ class DataStorage:
             data.append(d)
         head = ["Time in seconds", "time", "Volts", "Current", "Power"]
         # Store the table in a text file
-        today = date.today() 
-        # try:
-        # Find the absolute path to the current file
-        abs = os.path.abspath("").replace("\\", "/")
-        # Use the absolute path to create a path to the Data folder
-        # filePath = f"{abs}/Data/{testName} for {c_rate}C nr. {cycleNr + 1} at {temperature}° celsius     "  + str(datetime.now().strftime("%d_%m_%Y %H_%M_%S"))
-        # Tímabundin breyting fyrir Dropbox
-        filePath = f"C:/Users/runson/Dropbox/Sharing/Alor test/{testName}_{c_rate}C_no_{cycleNr + 1}_" + str(datetime.now().strftime("%d_%m_%Y %H_%M_%S"))
- #       filePath = f"C:/Users/runson/Dropbox/Sharing/Alor test/{testName} for {c_rate}C nr. {cycleNr + 1} at {temperature}° celsius     "  + str(datetime.now().strftime("%d_%m_%Y %H_%M_%S"))
-        # Display the Path for debug purposes
-        print(abs)
-        # Export to text file
+        today = date.today()
+
+        filePath = f"./Alor test/{testName}_{c_rate}C_no_{cycleNr + 1}_" + str(datetime.now().strftime("%d_%m_%Y %H_%M_%S"))
         self.exportTXTFile(filePath, data, head)
         # Export to CSV file
         self.exportCSVFile(filePath, data, head) 
