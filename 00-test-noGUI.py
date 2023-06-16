@@ -5,9 +5,6 @@ import threading
 import datetime as date
 from sqlalchemy import create_engine
 import pandas as pd
-class TestTypes:
-    def __init__(self):
-        self.testController = TestController()
 
     def runUPSTest(self, Charge_Volt_start: float, Charge_volt_end: float,
                    Charge_current_max: float, Charge_power_max: float, DCharge_volt_min: float,
@@ -16,15 +13,11 @@ class TestTypes:
 
         self.testController.event.clear()
 
-        return self.testController.NEWupsTest(Charge_Volt_start, Charge_volt_end,
-                                                Charge_current_max, Charge_power_max,
-                                                DCharge_volt_min, DCharge_current_max,
-                                                Slew_volt, Slew_current,
-                                                LeadinTime, Charge_time,
-                                                DCharge_time, numCycles, Goal_voltage)
+        return self.testController.NEWupsTest()
 def main():
     # sjá def og niðri
-    TObj = TestTypes()  # initiating a TestObject:: TObj
+
+
     it=1
     # 5 cells in series, max 12V, max 20mA, min 2V
 #    TObj.runUPSTest(11.99, 12.00, 0.09, 1.2, 2.0, 0.001, 0.001, 0.001, 10, 120, 30, it)
@@ -61,13 +54,16 @@ def main():
 #                   DCharge_current_max: float, Slew_volt: float, Slew_current: float,
 #                   LeadinTime: int, Charge_time: int, DCharge_time: int, numCycles: int):
 
-    Base = 4.5
-    data = TObj.runUPSTest(Charge_Volt_start=Base, Charge_volt_end=16,
+    Base = 4
+
+    TObj = TestController()  # initiating a TestObject:: TObj
+    TObj.event.clear()
+    data = TObj.run("NEWupsTest",Charge_Volt_start=Base, Charge_volt_end=16,
                     Charge_current_max=2.0, Charge_power_max=9.9,
-                    DCharge_volt_min=Base-2, DCharge_current_max=0.05,
+                    DCharge_volt_min=Base, DCharge_current_max=0.05,
                     Slew_volt=0.005, Slew_current=0.005,
                     LeadinTime=5, Charge_time=10,
-                    DCharge_time=10, numCycles=1, Goal_voltage=8)
+                    DCharge_time=10, numCycles=20, Goal_voltage=12)
 
     database = "Alor - DB"
     user = "postgres"
@@ -79,7 +75,10 @@ def main():
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
 
     # Insert the DataFrame into the database table
-    data.to_sql('testdata', engine, if_exists='append', index=False)
+    try:
+        data.to_sql('testdata', engine, if_exists='append', index=False)
+    except:
+        print("Data was not inserted into the sql server")
 
 if __name__ == "__main__":
     main()

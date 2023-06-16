@@ -304,13 +304,9 @@ class TestController:
                    DCharge_current_max: float, Slew_volt: float, Slew_current: float,
                    LeadinTime: int, Charge_time: int, DCharge_time: int, numCycles: int, Goal_voltage: float):
 
-        TotstartTime = datetime.now()
         # Setting parameters and limits
         self.powerSupplyController.stopOutput()
         print(f"Stopping output from Power Supply")
-
-        #        self.powerSupplyController.setVoltage(Charge_Volt_start)
-        #        print(f"Set the initial voltage to {Charge_Volt_start}")
         print("===========================")
         print(f"Charge time {Charge_time}")
         self.setVoltageLimMax((Charge_volt_end - 0.01))
@@ -355,9 +351,7 @@ class TestController:
                          'c_rate': [],
                          'cycle_number': [],
                          'date': []}
-
             DF = pd.DataFrame(datasetup)
-
 
             ## Charging/Discharging loop starts
             first_cycle = True
@@ -396,11 +390,11 @@ class TestController:
                 print('Discharging')
                 while True:
                     data = copy.deepcopy(datasetup)
-                    data["testtype"] = "NEWupsTest"
-                    data["cycle_number"] = int(cycleNumber)
+                    data["testtype"].append("NEWupsTest")
+                    data["cycle_number"].append(int(cycleNumber))
                     secs = datetime.now() - DischargestartTime
-                    secs = float(str(secs.seconds) + "." + str(secs.microseconds))
-                    data["time"] = secs
+                    secs = float(f"{secs.seconds}.{str(secs.microseconds)[:2]}")
+                    data["time"].append(secs)
 
                     # while Discharging do the following
                     if self.breaker:
@@ -411,12 +405,12 @@ class TestController:
                     v = self.getVoltageELC()  # read voltage from electronic load
                     c = self.getCurrentELC()  # read the current from electronic load
 
-                    data["volts"] = v
-                    data["current"] = c
-                    data["power"] = v*c
-                    data["c_rate"] = DCharge_current_max
+                    data["volts"].append(v)
+                    data["current"].append(c)
+                    data["power"].append(v*c)
+                    data["c_rate"].append(DCharge_current_max)
 
-                    data["date"] = str(datetime.today())
+                    data["date"].append(str(datetime.today()))
 
                     print(f"{cycleNumber} of {numCycles} -DISCHARGING- {tmp.total_seconds():03.2f} s - V:{v:.2f} C:{c:.2f}")
                     dataStorage.addTime(float(tmp.total_seconds()))
@@ -426,7 +420,9 @@ class TestController:
                         print(f"below {DCharge_volt_min} volts")
                         break
 
-                    DF = DF.append(data, ignore_index=True)
+                    new_df = pd.DataFrame(data)
+
+                    DF = pd.concat([DF, new_df], ignore_index=True)
 
                 self.stopDischarge()  # Inactivate the electronic load
                 ## Discharging loop ends
@@ -451,11 +447,11 @@ class TestController:
                         return DF
 
                     data = copy.deepcopy(datasetup)
-                    data["testtype"] = "NEWupsTest"
-                    data["cycle_number"] = int(cycleNumber)
+                    data["testtype"].append("NEWupsTest")
+                    data["cycle_number"].append(int(cycleNumber))
                     secs = datetime.now() - DischargestartTime
                     secs = float(str(secs.seconds) + "." + str(secs.microseconds))
-                    data["time"] = secs
+                    data["time"].append(secs)
 
 
                     # while Charging do the following
@@ -465,12 +461,12 @@ class TestController:
                     v = self.getVoltageELC()  # read voltage from electronic load - this is the voltage of the cell
                     c = self.getCurrentPSC()  # read the current from Power Supply
 
-                    data["volts"] = v
-                    data["current"] = c
-                    data["power"] = v*c
-                    data["c_rate"] = DCharge_current_max
+                    data["volts"].append(v)
+                    data["current"].append(c)
+                    data["power"].append(v*c)
+                    data["c_rate"].append(DCharge_current_max)
 
-                    data["date"] = str(datetime.today())
+                    data["date"].append(str(datetime.today()))
 
                     loopDelta_C = c - before_current
                     loopDelta_V = v - before_voltage
@@ -519,8 +515,10 @@ class TestController:
                     before_voltage = v
                     before_current = c
 
-                    DF = DF.append(data, ignore_index=True)
+                    new_df = pd.DataFrame(data)
 
+                    DF = pd.concat([DF, new_df], ignore_index=True)
+                time.sleep(1000)
                 self.stopPSOutput()  # stop the output from the power supply
                 print("Goal voltage reached")
                 ## Charging loop ends
