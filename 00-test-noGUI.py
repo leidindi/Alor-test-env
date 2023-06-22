@@ -6,14 +6,6 @@ import datetime as date
 from sqlalchemy import create_engine
 import pandas as pd
 
-    def runUPSTest(self, Charge_Volt_start: float, Charge_volt_end: float,
-                   Charge_current_max: float, Charge_power_max: float, DCharge_volt_min: float,
-                   DCharge_current_max: float, Slew_volt: float, Slew_current: float,
-                   LeadinTime: int, Charge_time: int, DCharge_time: int, numCycles: int, Goal_voltage: float):
-
-        self.testController.event.clear()
-
-        return self.testController.NEWupsTest()
 def main():
     # sjá def og niðri
 
@@ -58,7 +50,7 @@ def main():
 
     TObj = TestController()  # initiating a TestObject:: TObj
     TObj.event.clear()
-    data = TObj.run("NEWupsTest",Charge_Volt_start=Base, Charge_volt_end=16,
+    data = TObj.run("NEWupsTest", Charge_Volt_start=Base, Charge_volt_end=16,
                     Charge_current_max=2.0, Charge_power_max=9.9,
                     DCharge_volt_min=Base, DCharge_current_max=0.05,
                     Slew_volt=0.005, Slew_current=0.005,

@@ -1,4 +1,5 @@
 import pyvisa
+
 from tkinter import *
 # Class for communication with the NI-VISA driver to control the power supply
 class PowerSupplyController:
