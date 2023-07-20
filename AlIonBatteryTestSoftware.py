@@ -12,6 +12,8 @@ from AlIonTestSoftwareDataManagement import DataStorage
 import random as rand
 import keyboard
 import pandas as pd
+from sqlalchemy import create_engine
+
 
 # Class used to control test procedures
 class TestController:
@@ -167,8 +169,141 @@ class TestController:
     #     self.electronicLoadController.stopDischarge()
 
     # Functions to read realtime VOLTAGE, CURRENT and POWER from the power supply
+    def create_battery(self, **kwargs):
 
-    def run(self,testType, **kwargs):
+        database = "Alor - DB"
+        user = "postgres"
+        password = "1234"
+        port = 5432
+        host = "localhost"
+
+        data = {'attribute1': [],
+                'attribute2': [],
+                'attribute3': [],
+                'attribute4': [],
+                'attribute5': [],
+                'date_made': []}
+        try:
+            data["attribute1"].append(kwargs['attribute1'])
+        except:
+            data["attribute1"].append("")
+
+        try:
+            data["attribute2"].append(kwargs['attribute2'])
+        except:
+            data["attribute2"].append("")
+
+        try:
+            data["attribute3"].append(kwargs['attribute3'])
+        except:
+            data["attribute3"].append("")
+
+        try:
+            data["attribute4"].append(kwargs['attribute4'])
+        except:
+            data["attribute4"].append("")
+
+        try:
+            data["attribute5"].append(kwargs['attribute5'])
+        except:
+            data["attribute5"].append("")
+
+        try:
+            data["date_made"].append(kwargs["date_made"])
+        except:
+            data["date_made"].append(str(datetime.today()))
+
+
+        DF = pd.DataFrame(data)
+
+        # INSERT INTO public.battery_table(
+        # battery_id, attribute1, attribute2, attribute3, attribute4, attribute5, date_made)
+        # VALUES (?, ?, ?, ?, ?, ?, ?);
+
+        # Create a database connection
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
+
+        # Insert the DataFrame into the database table
+        try:
+            DF.to_sql('battery_table', engine, if_exists='append', index=False)
+        except:
+            print("Data was not inserted into the sql server")
+
+        engine.dispose()
+
+
+        self.set_battery(**kwargs)
+
+    def set_battery(self, **kwargs):
+        print(kwargs)
+        database = "Alor - DB"
+        user = "postgres"
+        password = "1234"
+        port = 5432
+        host = "localhost"
+
+        try:
+            attribute1 = kwargs['attribute1']
+        except:
+            attribute1 = 'NULL'
+
+        try:
+            attribute2 = kwargs['attribute2']
+        except:
+            attribute2 = 'NULL'
+
+        try:
+            attribute3 = kwargs['attribute3']
+        except:
+            attribute3 = 'NULL'
+
+        try:
+            attribute4 = kwargs['attribute4']
+        except:
+            attribute4 = 'NULL'
+
+        try:
+            attribute5 = kwargs['attribute5']
+        except:
+            attribute5 = 'NULL'
+
+        try:
+            date_made = kwargs["date_made"]
+        except:
+
+            date_made = str(datetime.today())
+
+
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
+
+        # Insert the DataFrame into the database table
+        query = f'SELECT battery_id, date_made ' \
+                f'FROM public.battery_table ' \
+                f'where attribute1 = COALESCE({attribute1}, attribute1)  ' \
+                f'and attribute2 = COALESCE({attribute2}, attribute2) ' \
+                f'and attribute3 = COALESCE({attribute3}, attribute3)' \
+                f'and attribute4 = COALESCE({attribute4}, attribute4)' \
+                f'and attribute5 = COALESCE({attribute5}, attribute5)' \
+                f'and date_made = COALESCE({date_made}, date_made)  '
+        result = engine.execute(query)
+
+        # Populate the datasetup dictionary with the retrieved data
+        for row in result:
+            print(row)
+        '''
+            data['testtype'].append(row['testtype'])
+            data['time'].append(row['time'])
+            data['volts'].append(row['volts'])
+            data['current'].append(row['current'])
+            data['power'].append(row['power'])
+            data['c_rate'].append(row['c_rate'])
+            data['cycle_number'].append(row['cycle_number'])
+            data['date'].append(row['date'])
+        '''
+        engine.dispose()
+
+
+    def run(self, testType, **kwargs):
 
         Charge_time = kwargs["Charge_time"]
         DCharge_time = kwargs["DCharge_time"]
@@ -226,6 +361,15 @@ class TestController:
             testRunner = self.PhotoVoltaicTest
         elif testType == "charging":
             testRunner = self.charging
+        elif testType == "constantCurrentTest":
+            testRunner = self.constantCurrentTest
+        elif testType == "constantVoltageTest":
+            testRunner = self.constantVoltageTest
+        elif testType == "CC":
+            testRunner = self.CC
+        elif testType == "CV":
+            testRunner = self.CV
+
         else:
             print("The testType chosen is not recognized")
             raise ValueError
@@ -268,13 +412,39 @@ class TestController:
         self.stopPSOutput()
         self.stopDischarge()
         print("-- Closure successful --")
-        self.event.set()
 
-        return thread_runner.result()
+        data = thread_runner.result()
 
-    def NEWupsTest(self, Charge_Volt_start: float, Charge_volt_end: float, DCharge_volt_min: float,
-                   DCharge_current_max: float, Slew_current: float, numCycles: int, Goal_voltage: float,**kwargs):
+        database = "Alor - DB"
+        user = "postgres"
+        password = "1234"
+        port = 5432
+        host = "localhost"
 
+        # Create a database connection
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
+
+        # Insert the DataFrame into the database table
+        try:
+            data.to_sql('data_table', engine, if_exists='append', index=False)
+        except:
+            print("Data was not inserted into the sql server")
+
+        engine.dispose()
+
+        return data
+
+    def constantCurrentTest(self, **kwargs):
+
+        Charge_Volt_start = kwargs["Charge_Volt_start"]
+        Charge_volt_end = kwargs["Charge_volt_end"]
+        DCharge_volt_min = kwargs["DCharge_volt_min"]
+        DCharge_current_max = kwargs["DCharge_current_max"]
+        Slew_current = kwargs["Slew_current"]
+        numCycles = kwargs["numCycles"]
+        Goal_voltage = kwargs["Goal_voltage"]
+        c_rate = kwargs["c_rate"]
+        Charge_current_max = kwargs["Charge_current_max"]
 
         datasetup = {'testtype': [],
                      'time': [],
@@ -285,17 +455,11 @@ class TestController:
                      'cycle_number': [],
                      'date': []}
         DF = pd.DataFrame(datasetup)
+        testtype = "constantCurrentTest"
 
         ## Charging/Discharging loop starts
-        first_cycle = True
 
-        for cycleNumber in range(int(numCycles)+1):
-
-            # this is to wait for the battery recovery after loading, it is skipped if this is the initial cycle
-            if first_cycle:
-                first_cycle = False
-            else:
-                time.sleep(25)
+        for cycleNumber in range(1, int(numCycles) + 1):
 
             # reset the PSU initial voltage output so that it always starts from the same place
             Volt_start = Charge_Volt_start
@@ -323,7 +487,7 @@ class TestController:
             print('Discharging')
             while True:
                 data = copy.deepcopy(datasetup)
-                data["testtype"].append("NEWupsTest")
+                data["testtype"].append(testtype)
                 data["cycle_number"].append(int(cycleNumber))
                 secs = datetime.now() - DischargestartTime
                 secs = float(f"{secs.seconds}.{str(secs.microseconds)[:2]}")
@@ -331,17 +495,17 @@ class TestController:
 
                 # while Discharging do the following
                 if self.breaker:
-                    return
-                time.sleep(0.1)  # Wait between measurements
+                    return DF
+                time.sleep(self.timeInterval)  # Wait between measurements
                 tmp = datetime.now() - DischargestartTime
                 # v = self.getVoltage()  # read the voltage from multimeter 12061
                 v = self.getVoltageELC()  # read voltage from electronic load
                 c = self.getCurrentELC()  # read the current from electronic load
 
                 data["volts"].append(v)
-                data["current"].append(c)
-                data["power"].append(v*c)
-                data["c_rate"].append(DCharge_current_max)
+                data["current"].append(c * -1)
+                data["power"].append(v * c)
+                data["c_rate"].append(c_rate)
 
                 data["date"].append(str(datetime.today()))
 
@@ -358,16 +522,8 @@ class TestController:
                 DF = pd.concat([DF, new_df], ignore_index=True)
 
             self.stopDischarge()  # Inactivate the electronic load
+
             ## Discharging loop ends
-            time.sleep(5)
-            # Create a table from the measurements made in this cycle (27.0 is the temperature - now kept fixed)
-
-
-            # Charging loop
-
-            dataStorage.addTime(0)  # for finding where discharging ends and charging starts
-            dataStorage.addVoltage(0)  # for finding where discharging ends and charging starts
-            dataStorage.addCurrent(0)  # for finding where discharging ends and charging starts
 
             self.startPSOutput()
             self.setVoltage(Volt_start)
@@ -375,17 +531,16 @@ class TestController:
 
             before_voltage = 0
             before_current = 0
-            while float(self.powerSupplyController.getVoltage()) < Goal_voltage:
+            while float(self.getVoltageELC()) < Goal_voltage:
                 if self.breaker:
                     return DF
 
                 data = copy.deepcopy(datasetup)
-                data["testtype"].append("NEWupsTest")
+                data["testtype"].append(testtype)
                 data["cycle_number"].append(int(cycleNumber))
                 secs = datetime.now() - DischargestartTime
                 secs = float(str(secs.seconds) + "." + str(secs.microseconds))
                 data["time"].append(secs)
-
 
                 # while Charging do the following
                 time.sleep(self.timeInterval)  # Wait between measurements
@@ -396,8 +551,8 @@ class TestController:
 
                 data["volts"].append(v)
                 data["current"].append(c)
-                data["power"].append(v*c)
-                data["c_rate"].append(DCharge_current_max)
+                data["power"].append(v * c)
+                data["c_rate"].append(c_rate)
 
                 data["date"].append(str(datetime.today()))
 
@@ -405,9 +560,9 @@ class TestController:
                 loopDelta_V = v - before_voltage
                 change_string = "positive"
                 # a semi random correction, this is to prevent oscillating corrections
-                Correction = 0.05 * rand.uniform(0.75,0.1)
+                Correction = 0.03 * rand.uniform(0.5, 1)
 
-                if loopDelta_C > Slew_current or c > 0.05:
+                if loopDelta_C > Slew_current or c > Charge_current_max:
                     # we're over the slew current rate or current rate so we need to step back the voltage a little bit
                     Correction *= -1
                     change_string = "negative"
@@ -419,10 +574,10 @@ class TestController:
                     # undo the correction so that we don't go over the limit
                     Volt_start -= Correction
 
-                elif c < 0.001:
+                elif c < 0.01:
                     # check for when the current is near 0
                     # should be able to go much faster, this is a catch-up check
-                    Volt_start += Correction*3
+                    Volt_start += Correction * 5
 
                 if Volt_start < v:
                     # check for if the battery voltage is higher than the PSC output voltage
@@ -431,19 +586,16 @@ class TestController:
                     # should be able to go much faster
                     Volt_start = v
 
-                print("\n"*15)
+                print("\n" * 15)
                 print(f"--- voltage correction {change_string} --->"
                       f" max output Volt : {Charge_volt_end}, output Volt : {Volt_start:.1f}, goal Volt : {Goal_voltage}")
                 self.setVoltage(Volt_start)
 
                 print(
-                    f"{cycleNumber} of {numCycles} -CHARGING- Voltage_PSC:{v_ps:.1f} Voltage_ELC:{v:.1f} Current:{c:.3f}")
+                    f"{cycleNumber} of {numCycles} -CHARGING- Voltage_PSC:{v_ps:.1f} Voltage_ELC:{v:.2f} Current:{c:.3f}")
 
                 print(f"Voltage delta for the iteration {loopDelta_V:.3f}")
                 print(f"Current delta for the iteration {loopDelta_C:.3f}")
-                dataStorage.addTime(float(tmp.total_seconds()))
-                dataStorage.addVoltage(v)
-                dataStorage.addCurrent(c)
 
                 before_voltage = v
                 before_current = c
@@ -455,19 +607,15 @@ class TestController:
             print("Goal voltage reached")
             # how long you want to charge the cell at the final voltage
             charging_duration = 0
-            time.sleep(charging_duration)
 
             # stop the output from the power supply, when done charging
             self.stopPSOutput()
             ## Charging loop ends
-
-            # insert data to SQL database
-            #dataStorage.createTable("UPS_", DCharge_current_max, cycleNumber, 27.0, self.timeInterval, str(Charge_time))
-
         self.breaker = True
         return DF
 
-    def upsTest(self, chargeTime: int, dischargeTime: int, waitTime: int, numCycles: int, CPar, temp: int,**kwargs):
+    def constantVoltageTest(self, chargeTime: int, dischargeTime: int, waitTime: int, numCycles: int, CPar, temp: int,
+                            **kwargs):
         startTime = time.time()
         currentMeasurement = 1.0
         self.event.clear()
@@ -542,8 +690,6 @@ class TestController:
                 # Create a table from the current test data
                 dataStorage.createTable("UPS Test", cParameter, cycleNumber, temp, self.timeInterval, chargeTime)
         # Set the event to indicate that testing is finished
-        self.event.set()
-
     def PhotoVoltaicTest(self, waitTime: int, numCycles: int, CParCharge, CParDischarge, temp: int, **kwargs):
         startTime = time.time()
         currentMeasurement = 1.0
@@ -604,8 +750,6 @@ class TestController:
                 dataStorage.createTable("Endurance Test", cParameter, cycleNumber, temp, self.timeInterval)
         # Set the event to indicate that testing is finished
         self.event.set()
-
-
     # Test protocal for testing the capacity of a battery
     def capacityTest(self, chargeTime: int, waitTime: int, numCycles: int, CPar, temp: int):
         # Clear event to indicate that test is currently running
@@ -672,7 +816,6 @@ class TestController:
             print(ampHourCapacity)
         # Set the event to indicate that testing is done
         self.event.set()
-
     def enduranceTest(self, chargeTime: int, waitTime: int, numCycles: int, CPar, temp: int):
         self.event.clear()
         # Create a loop that will run one time for each element of the eather CPar or TempPar
@@ -723,7 +866,7 @@ class TestController:
                     dataStorage.addCurrent(c)
                     if (float(v) < self.OCVEmpty):
                         break
-                    time.sleep(1)
+                    time.sleep(0.01)
                     ASeconds += self.C_rate * cParameter
                 # Stop discharging battery
                 self.electronicLoadController.stopDischarge()
@@ -737,5 +880,313 @@ class TestController:
         # Set the event to indicate that testing is finished
         self.event.set()
 
-    def charging(self,**kwargs):
-        return 0
+    def CC(self, **kwargs):
+        Charge_Volt_start = kwargs["Charge_Volt_start"]
+        numCycles = kwargs["numCycles"]
+        c_rate = kwargs["c_rate"]
+        Slew_current = kwargs["Slew_current"]
+        Charge_volt_end = kwargs["Charge_volt_end"]
+        testtype = kwargs["testtype"]
+        cycleNumber = kwargs["cycleNumber"]
+        duration = kwargs["duration"]
+        Goal_voltage = kwargs["Goal_voltage"]
+
+        previous_run_time = 0
+        try:
+            data = kwargs["data"]
+            # if the previous part of the charging process was also charging then we want to
+            # count the time from where the last charging section ended
+            if testtype == data["testtype"][-1]:
+                previous_run_time = data["time"][-1]
+        except:
+            data = {'testtype': [],
+                    'time': [],
+                    'volts': [],
+                    'current': [],
+                    'power': [],
+                    'c_rate': [],
+                    'cycle_number': [],
+                    'date': []}
+
+        ChargestartTime = datetime.now()
+        Cend_time = ChargestartTime + duration
+
+        testtype = "charging"
+        ChargestartTime = datetime.now()
+        self.setCurrent(c_rate)
+
+        Volt_start = Charge_Volt_start
+
+        before_current = 0
+
+        while (datetime.now() < Cend_time):
+
+            if self.breaker:
+                return data
+
+            data["testtype"].append(testtype)
+            data["cycle_number"].append(int(cycleNumber))
+            secs = datetime.now() - ChargestartTime
+            secs = float(str(secs.seconds) + "." + str(secs.microseconds))
+            data["time"].append(secs+previous_run_time)
+
+            # while Charging do the following
+            tmp = datetime.now() - ChargestartTime
+
+            v_ps = self.getVoltagePSC()  # read the voltage from Power Supply - this is the applied voltage
+            v = self.getVoltageELC()  # read voltage from electronic load - this is the voltage of the cell
+            c = self.getCurrentPSC()  # read the current from Power Supply
+
+            loopDelta_C = c - before_current
+            Correction = 0.03 * rand.uniform(0.1, 0.75)
+
+            if loopDelta_C > Slew_current or c > c_rate:
+                # we're over the slew current rate or current rate so we need to step back the voltage a little bit
+                Correction *= -1
+
+            # apply the correction
+            Volt_start += Correction
+
+            if Volt_start > Charge_volt_end:
+                # undo the correction so that we don't go over the limit
+                Volt_start -= Correction
+
+            elif c < 0.01:
+                # check for when the current is near 0
+                # should be able to go much faster, this is a catch-up check
+                Volt_start += Correction * 2
+
+            if Volt_start < v:
+                # check for if the battery voltage is higher than the PSC output voltage
+                # at current time
+                # this can happen but only and makes the process slower
+                # should be able to go much faster
+                Volt_start = v
+
+            data["volts"].append(v)
+            data["current"].append(c)
+            data["power"].append(v * c)
+            data["c_rate"].append(c_rate)
+
+            data["date"].append(str(datetime.today()))
+            print(f"{cycleNumber} of {numCycles} - CC CHARGING- ",end="")
+            print(f"{tmp.total_seconds()+previous_run_time:03.2f}",end="")
+            print(f" s of {duration.total_seconds()+previous_run_time:.1f} s - ",end="")
+            print(f"V_PS:{v_ps:.4f} V:{v:.4f} C:{c:.4f}")
+            self.setVoltage(Volt_start)
+
+            before_current = c
+        return data
+
+    def CV(self, **kwargs):
+        numCycles = kwargs["numCycles"]
+        c_rate = kwargs["c_rate"]
+        Charge_volt_end = kwargs["Charge_volt_end"]
+        testtype = kwargs["testtype"]
+        cycleNumber = kwargs["cycleNumber"]
+        duration = kwargs["duration"]
+        Goal_voltage = kwargs["Goal_voltage"]
+
+        previous_run_time = 0
+        try:
+            data = kwargs["data"]
+            # if the previous part of the charging process was also charging then we want to
+            # count the time from where the last charging section ended
+            if testtype == data["testtype"][-1]:
+                previous_run_time = data["time"][-1]
+        except:
+            data = {'testtype': [],
+                         'time': [],
+                         'volts': [],
+                         'current': [],
+                         'power': [],
+                         'c_rate': [],
+                         'cycle_number': [],
+                         'date': []}
+
+        ChargestartTime = datetime.now()
+        Cend_time = ChargestartTime + duration
+
+        self.setVoltage(Goal_voltage)
+
+        while (datetime.now() < Cend_time):
+
+            if self.breaker:
+                return data
+
+            data["testtype"].append(testtype)
+            data["cycle_number"].append(int(cycleNumber))
+            secs = datetime.now() - ChargestartTime
+            secs = float(str(secs.seconds) + "." + str(secs.microseconds))
+            data["time"].append(secs+previous_run_time)
+            data["date"].append(str(datetime.today()))
+
+            # while Charging do the following
+            tmp = datetime.now() - ChargestartTime
+
+            v_ps = self.getVoltagePSC()  # read the voltage from Power Supply - this is the applied voltage
+            v = self.getVoltageELC()  # read voltage from electronic load - this is the voltage of the cell
+            c = self.getCurrentPSC()  # read the current from Power Supply
+
+            print(f"{cycleNumber} of {numCycles} - CV CHARGING- ", end="")
+            print(f"{tmp.total_seconds()+previous_run_time:03.2f}", end="")
+            print(f" s of {duration.total_seconds()+previous_run_time:.1f} s - ", end="")
+            print(f"V_PS:{v_ps:.4f} V:{v:.4f} C:{c:.4f}")
+
+            data["volts"].append(v)
+            data["current"].append(c)
+            data["power"].append(v * c)
+            data["c_rate"].append(c_rate)
+        return data
+
+    def charging(self, **kwargs):
+        Charge_Volt_start = kwargs["Charge_Volt_start"]
+        numCycles = kwargs["numCycles"]
+        c_rate = kwargs["c_rate"]
+        Charge_time = kwargs["Charge_time"]
+        DCharge_time = kwargs["DCharge_time"]
+        DCharge_current_max = kwargs["DCharge_current_max"]
+        Charge_power_max = kwargs["Charge_power_max"]
+        Slew_current = kwargs["Slew_current"]
+        Slew_volt = kwargs["Slew_volt"]
+        Charge_current_max = kwargs["Charge_current_max"]
+        Charge_volt_end = kwargs["Charge_volt_end"]
+        try:
+            Charge_routine = kwargs["Charge_routine"]
+        except:
+            Charge_routine = False
+            print("There was no routine specified, the default charging method is constant current charging")
+
+        datasetup = {'testtype': [],
+                     'time': [],
+                     'volts': [],
+                     'current': [],
+                     'power': [],
+                     'c_rate': [],
+                     'cycle_number': [],
+                     'date': []}
+        DF = pd.DataFrame(datasetup)
+
+        Cduration = timedelta(seconds=Charge_time)  # Charge each cycle for Charge_time seconds
+        Dduration = timedelta(seconds=DCharge_time)  # Discharge each cycle for DCharge_time seconds
+
+        ## Charging/Discharging loop starts
+        for cycleNumber in range(1, int(numCycles) + 1):
+
+            Dend_time = datetime.now() + Dduration  # set the time when to stop Discharging
+            ## Discharging loop
+
+            self.stopDischarge()
+            self.setCCLmode()  # set the DC to CC low range mode
+
+            self.setCCcurrentL1(c_rate)  # Set the desired current of channel L1&L2
+            self.startDischarge()  # turn on DC load
+
+            print('Discharging')
+            testtype = "discharging"
+            DischargestartTime = datetime.now()
+            while (datetime.now() < Dend_time):
+                if self.breaker:
+                    return DF
+
+                data = copy.deepcopy(datasetup)
+                data["testtype"].append(testtype)
+                data["cycle_number"].append(int(cycleNumber))
+                secs = datetime.now() - DischargestartTime
+                secs = float(str(secs.seconds) + "." + str(secs.microseconds))
+                data["time"].append(secs)
+
+                # while Discharging do the following
+                time.sleep(0.01)  # Wait between measurements
+                tmp = datetime.now() - DischargestartTime
+                # v = self.getVoltage()  # read the voltage from multimeter 12061
+                v = self.getVoltageELC()  # read voltage from electronic load
+                c = self.getCurrentELC()  # read the current from electronic load
+                print(
+                    f"{cycleNumber} of {numCycles} -DISCHARGING- {tmp.total_seconds():03.2f} s of {Dduration.total_seconds():.1f} s - V:{v:.4f} C:{c:.4f}")
+
+                data["volts"].append(v)
+                data["current"].append(c * -1)
+                data["power"].append(v * c)
+                data["c_rate"].append(DCharge_current_max)
+
+                data["date"].append(str(datetime.today()))
+
+                new_df = pd.DataFrame(data)
+
+                DF = pd.concat([DF, new_df], ignore_index=True)
+            self.stopDischarge()
+
+            # Charging loop
+            self.startPSOutput()
+            self.setVoltage(Charge_Volt_start)
+            print('Charging')
+
+            testtype = "charging"
+
+            if Charge_routine == False:
+                data = self.CC(duration=Cduration, cycleNumber=cycleNumber, data=data, testtype=testtype, **kwargs)
+            else:
+                for command in Charge_routine:
+
+                    commandType = command[0]
+                    duration = timedelta(seconds=command[1])
+
+                    if commandType == "CC":
+                        data = self.CC(duration=duration, cycleNumber=cycleNumber, data=data, testtype=testtype, **kwargs)
+                    elif commandType == "CV":
+                        data = self.CV(duration=duration, cycleNumber=cycleNumber, data=data, testtype=testtype, **kwargs)
+                    else:
+                        print("Faulty routine provided")
+                        raise ValueError
+            new_df = pd.DataFrame(data)
+
+            DF = pd.concat([DF, new_df], ignore_index=True)
+
+            self.stopPSOutput()  # stop the output from the power supply
+        # self.event.set()
+        self.breaker = True
+        return DF
+
+    def getData(self, fromID=None, toID=None):
+        if fromID is None or toID is None or toID < fromID:
+            print("You need to identify the data you're trying to retrieve'")
+            raise ValueError
+
+        from sqlalchemy import create_engine
+
+        data = {'testtype': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+
+        database = "Alor - DB"
+        user = "postgres"
+        password = "1234"
+        port = 5432
+        host = "localhost"
+
+        # Create a database connection
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
+
+        # Execute the SQL query and retrieve data
+        query = f"SELECT testtype, time, volts, current, power, c_rate, cycle_number, date FROM public.testdata where id >= {fromID} and id <= {toID}"
+        result = engine.execute(query)
+
+        # Populate the datasetup dictionary with the retrieved data
+        for row in result:
+            data['testtype'].append(row['testtype'])
+            data['time'].append(row['time'])
+            data['volts'].append(row['volts'])
+            data['current'].append(row['current'])
+            data['power'].append(row['power'])
+            data['c_rate'].append(row['c_rate'])
+            data['cycle_number'].append(row['cycle_number'])
+            data['date'].append(row['date'])
+
+        engine.dispose()
+        return pd.DataFrame(data)

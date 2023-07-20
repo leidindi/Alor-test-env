@@ -1,94 +1,41 @@
-"""import pandas as pd
-
-# Create a dataframe from a dictionary
-data = {'Name': ['John', 'Emma', 'Peter', 'Olivia'],
-        'Age': [28, 24, 32, 29],
-        'City': ['New York', 'London', 'Paris', 'Sydney']}
-df = pd.DataFrame(data)
-
-# Print the dataframe
-print(df)
-
-# Accessing columns
-print(df['Name'])
-print(df.Age)
-
-# Accessing rows
-print(df.loc[0])  # Access row by label
-print(df.iloc[2])  # Access row by index
-
-# Filtering rows
-filtered_df = df[df['Age'] > 25]
-print(filtered_df)
-
-# Adding a new column
-df['Profession'] = ['Engineer', 'Artist', 'Doctor', 'Writer']
-print(df)
-
-# Applying a function to a column
-df['Age in 10 years'] = df['Age'].apply(lambda x: x + 10)
-print(df)
-
-
-import psycopg2
-from sqlalchemy import create_engine
 import pandas as pd
+import matplotlib.pyplot as plt
 
-data = {'testtype': ["boom"],
-        'time': [1],
-        'volts': [1],
-        'current': [1],
-        'power': [1],
-        'c_rate': [1],
-        'cycle_number': [1],
-        'date': ["2000-11-11"],
-        'id': [2]}
+# Sample data
+data = {
+    'Year': [2018, 2018, 2018, 2018, 2018,
+             2019, 2019, 2019, 2019, 2019,
+             2020, 2020, 2020, 2020, 2020,
+             2020, 2020, 2020, 2019, 2020,
+             2020, 2020, 2020, 2018, 2020],
+    'Country': ['USA', 'Canada', 'Germany', 'France', 'UK', 'USA', 'Canada', 'Germany', 'France', 'UK',
+                'USA', 'Canada', 'Germany', 'France', 'UK', 'USA', 'Canada', 'Germany', 'France', 'UK',
+                'USA', 'Canada', 'Germany', 'France', 'UK'],
+    'Population': [327.2, 37.6, 83.0, 30, 66.0,
+                   329.1, 37.9, 82.8, 40, 66.3,
+                   331.0, 38.2, 82.5, 30, 66.6,
+                   331.0, 38.2, 82.5, 20, 66.6,
+                   331.0, 38.2, 82.5, 30, 66.6],
+    'GDP': [20.58, 1.84, 3.86, 2, 2.94,
+            21.43, 1.89, 3.96, 3, 2.97,
+            22.68, 1.93, 4.01, 2, 3.02,
+            22.68, 1.93, 4.01, 1, 3.02,
+            22.68, 1.93, 4.01, 2, 3.02]
+}
 
-current_date = date.today()
+# Create a dataframe
 df = pd.DataFrame(data)
 
-# Replace these with your database credentials
-database = "Alor - DB"
-user = "postgres"
-password = "1234"
-port = 5432
-host = "localhost"
+# Filter data for France
+france_df = df[df['Country'] == 'France']
 
-# Create a database connection
-engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
+# Plot the GDP for France
+print(france_df.index[0])
+plt.plot(france_df['Year'], france_df['GDP'])
+plt.xlabel('Year')
+plt.ylabel('GDP')
+plt.title('GDP for France over the Years')
+plt.grid(True)
 
-# Insert the DataFrame into the database table
-df.to_sql('testdata', engine, index=False)
-print("adfadfadfasdfasf") """
-
-import threading
-
-class MyThread(threading.Thread):
-    def __init__(self, target, args=()):
-        super().__init__(target=target, args=args)
-        self._result = None
-
-    def run(self):
-        if self._target is not None:
-            self._result = self._target(*self._args)
-
-    def result(self):
-        return self._result
-
-def testRunner(arg):
-    # Perform some computation or task
-    result = arg * 2
-
-    # Return the result
-    return result
-
-Charge_Volt_start = 5
-
-# Create the custom thread
-thread_runner = MyThread(target=testRunner, args=(Charge_Volt_start,))
-thread_runner.start()
-thread_runner.join()
-
-# Retrieve the return value
-thread_result = thread_runner.result()
-print("Thread result:", thread_result)
+# Show the plot
+plt.show()
