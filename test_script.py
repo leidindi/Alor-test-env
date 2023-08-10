@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-
+"""
 # Sample data
 data = {
     'Year': [2018, 2018, 2018, 2018, 2018,
@@ -39,3 +39,26 @@ plt.grid(True)
 
 # Show the plot
 plt.show()
+"""
+
+import pandas as pd
+
+# Assuming your original DataFrame is named 'original_df'
+# Sample data for the original DataFrame
+data = {
+    'age': [25, 30, 22, 40],
+    'year': [2020, 2019, 2021, 2018],
+    'volume': [100, 150, 80, 200]
+}
+
+original_df = pd.DataFrame(data)
+
+# Create a new DataFrame with only the 'age' column from the original DataFrame
+new_df = original_df[['age']].copy()
+
+# Add two new columns 'test_id' and 'battery_id' with the same value for all rows
+new_df['test_id'] = 10
+new_df['battery_id'] = 100
+
+# Print the new DataFrame
+print(new_df)

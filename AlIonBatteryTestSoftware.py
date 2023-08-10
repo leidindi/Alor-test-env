@@ -34,7 +34,7 @@ class TestController:
             self.electronicLoadController = ElectronicLoadControllerMock()
             self.multimeterController = MultimeterControllerMock()
         # Indicates the number of seconds between each measurement
-        self.timeInterval = 0.2
+        self.timeInterval = 0.5
         # Variable for keeping track of the open circuit voltage of a full battery
         self.OCVFull = 0.0
         # Variable for keeping track of the open circuit voltage of an empty battery
@@ -44,6 +44,7 @@ class TestController:
         # Create an event to indicate if test is running
         self.event = threading.Event()
 
+        self.batteryID = 0
         self.breaker = False
 
     # Defining basic functionality of all remote devices through the device controller
@@ -232,10 +233,9 @@ class TestController:
         engine.dispose()
 
 
-        self.set_battery(**kwargs)
+        #self.set_battery(**kwargs)
 
     def set_battery(self, **kwargs):
-        print(kwargs)
         database = "Alor - DB"
         user = "postgres"
         password = "1234"
@@ -243,41 +243,40 @@ class TestController:
         host = "localhost"
 
         try:
-            attribute1 = kwargs['attribute1']
+            attribute1 = '\''+ kwargs['attribute1'] + '\''
         except:
             attribute1 = 'NULL'
 
         try:
-            attribute2 = kwargs['attribute2']
+            attribute2 = '\''+ kwargs['attribute2'] + '\''
         except:
             attribute2 = 'NULL'
 
         try:
-            attribute3 = kwargs['attribute3']
+            attribute3 = '\''+ kwargs['attribute3'] + '\''
         except:
             attribute3 = 'NULL'
 
         try:
-            attribute4 = kwargs['attribute4']
+            attribute4 = '\''+ kwargs['attribute4'] + '\''
         except:
             attribute4 = 'NULL'
 
         try:
-            attribute5 = kwargs['attribute5']
+            attribute5 = '\''+ kwargs['attribute5'] + '\''
         except:
             attribute5 = 'NULL'
 
         try:
-            date_made = kwargs["date_made"]
+            date_made ='\''+  kwargs["date_made"]  + '\''
         except:
-
-            date_made = str(datetime.today())
+            date_made = 'NULL'
 
 
         engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
 
         # Insert the DataFrame into the database table
-        query = f'SELECT battery_id, date_made ' \
+        query = f'SELECT battery_id, date_made, attribute1, attribute2, attribute3, attribute4, attribute5 ' \
                 f'FROM public.battery_table ' \
                 f'where attribute1 = COALESCE({attribute1}, attribute1)  ' \
                 f'and attribute2 = COALESCE({attribute2}, attribute2) ' \
@@ -288,8 +287,38 @@ class TestController:
         result = engine.execute(query)
 
         # Populate the datasetup dictionary with the retrieved data
-        for row in result:
-            print(row)
+        result = result.all()
+        if len(result) == 0:
+            print("There were no batteries compatible with your criteria")
+            print("Program ending")
+            quit()
+        elif len(result) == 1:
+            row = result[0]
+            print('Only one battery is compatible with your criteria, it will be automatically assigned to the test object')
+            print(f'The ID: {row[0]}, the date: {str(row[1])}, the attributes: {row[2]}-{row[3]}-{row[4]}-{row[5]}-{row[6]}')
+            self.batteryID = int(row[0])
+        else:
+            print("These are the batteries that are compatible with your criteria:")
+            id_list = []
+            for row in result:
+                id_list.append(row[0])
+                print(f'The ID: {row[0]}, the date: {str(row[1])}, the attributes: {row[2]}-{row[3]}-{row[4]}-{row[5]}-{row[6]}')
+            while True:
+                print("which battery would you like to choose? (q to quit)")
+                battery_id_input = input()
+
+                if battery_id_input == 'q':
+                    print("Quitting the program, you can't perform tests without assigning them to a battery")
+                    quit()
+                elif int(battery_id_input) in id_list:
+                    self.batteryID = int(battery_id_input)
+                    print("Battery successfully assigned to the test object")
+                    break
+                else:
+                    print("Incorrect battery id input, try again with a valid one from the following list:")
+                    print(id_list)
+
+
         '''
             data['testtype'].append(row['testtype'])
             data['time'].append(row['time'])
@@ -415,6 +444,8 @@ class TestController:
 
         data = thread_runner.result()
 
+
+
         database = "Alor - DB"
         user = "postgres"
         password = "1234"
@@ -424,9 +455,36 @@ class TestController:
         # Create a database connection
         engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
 
+        query = f"SELECT MAX(data_id) FROM public.data_table"
+        query_result = engine.execute(query)
+        first_item = query_result.one()
+        result = first_item[0]
+        data['data_id'] = result + 1
+        step = 0
+        for row in data['data_id']:
+            data.loc[step, ('data_id')] = row + step
+            #data['data_id'][step] = row + step
+            step += 1
+        #print(data['data_id'])
+
+        test = data[['data_id']].copy()
+        test['battery_id'] = self.batteryID
+        try:
+            query = f"SELECT MAX(test_id) FROM public.test_table"
+            query_result = engine.execute(query)
+            first_item = query_result.one()
+            result = first_item[0]
+
+            if result is None:
+                raise TypeError
+        except:
+            result = 0
+        test['test_id'] = result + 1
+
         # Insert the DataFrame into the database table
         try:
             data.to_sql('data_table', engine, if_exists='append', index=False)
+            test.to_sql('test_table', engine, if_exists='append', index=False)
         except:
             print("Data was not inserted into the sql server")
 
@@ -710,7 +768,7 @@ class TestController:
                     if (nextMeasurement > 0.0):
                         time.sleep(nextMeasurement)
                     if (self.event.is_set()):
-                        print("Testing has beed manually stopped")
+                        print("Testing has been manually stopped")
                         self.event.clear()
                         exit()
                     # Optain and store voltage and current
@@ -890,7 +948,10 @@ class TestController:
         cycleNumber = kwargs["cycleNumber"]
         duration = kwargs["duration"]
         Goal_voltage = kwargs["Goal_voltage"]
-
+        try:
+            following = kwargs["following"]
+        except:
+            following = False
         previous_run_time = 0
         try:
             data = kwargs["data"]
@@ -898,6 +959,9 @@ class TestController:
             # count the time from where the last charging section ended
             if testtype == data["testtype"][-1]:
                 previous_run_time = data["time"][-1]
+
+                if following:
+                    Charge_Volt_start = data["volts"][-1] + (12.0860 - 11.2660)
         except:
             data = {'testtype': [],
                     'time': [],
@@ -907,6 +971,10 @@ class TestController:
                     'c_rate': [],
                     'cycle_number': [],
                     'date': []}
+
+
+
+
 
         ChargestartTime = datetime.now()
         Cend_time = ChargestartTime + duration
@@ -972,8 +1040,9 @@ class TestController:
             print(f"{cycleNumber} of {numCycles} - CC CHARGING- ",end="")
             print(f"{tmp.total_seconds()+previous_run_time:03.2f}",end="")
             print(f" s of {duration.total_seconds()+previous_run_time:.1f} s - ",end="")
-            print(f"V_PS:{v_ps:.4f} V:{v:.4f} C:{c:.4f}")
+            print(f"V_PS:{v_ps:.4f} V:{v:.4f} C:{c:.4f}, diff of V:{v_ps-v:.4f}")
             self.setVoltage(Volt_start)
+            time.sleep(self.timeInterval)
 
             before_current = c
         return data
@@ -987,6 +1056,11 @@ class TestController:
         duration = kwargs["duration"]
         Goal_voltage = kwargs["Goal_voltage"]
 
+        try:
+            following = kwargs["following"]
+        except:
+            following = False
+
         previous_run_time = 0
         try:
             data = kwargs["data"]
@@ -994,6 +1068,8 @@ class TestController:
             # count the time from where the last charging section ended
             if testtype == data["testtype"][-1]:
                 previous_run_time = data["time"][-1]
+                if following:
+                    Goal_voltage = data["volts"][-1] + (12.0860-11.2660)
         except:
             data = {'testtype': [],
                          'time': [],
@@ -1006,6 +1082,8 @@ class TestController:
 
         ChargestartTime = datetime.now()
         Cend_time = ChargestartTime + duration
+
+
 
         self.setVoltage(Goal_voltage)
 
@@ -1037,6 +1115,7 @@ class TestController:
             data["current"].append(c)
             data["power"].append(v * c)
             data["c_rate"].append(c_rate)
+            time.sleep(self.timeInterval)
         return data
 
     def charging(self, **kwargs):
@@ -1115,6 +1194,7 @@ class TestController:
                 new_df = pd.DataFrame(data)
 
                 DF = pd.concat([DF, new_df], ignore_index=True)
+                time.sleep(self.timeInterval)
             self.stopDischarge()
 
             # Charging loop
@@ -1133,9 +1213,9 @@ class TestController:
                     duration = timedelta(seconds=command[1])
 
                     if commandType == "CC":
-                        data = self.CC(duration=duration, cycleNumber=cycleNumber, data=data, testtype=testtype, **kwargs)
+                        data = self.CC(duration=duration, cycleNumber=cycleNumber, data=data, testtype=testtype, following = True, **kwargs)
                     elif commandType == "CV":
-                        data = self.CV(duration=duration, cycleNumber=cycleNumber, data=data, testtype=testtype, **kwargs)
+                        data = self.CV(duration=duration, cycleNumber=cycleNumber, data=data, testtype=testtype, following = True, **kwargs)
                     else:
                         print("Faulty routine provided")
                         raise ValueError
@@ -1156,6 +1236,7 @@ class TestController:
         from sqlalchemy import create_engine
 
         data = {'testtype': [],
+                'data_id': [],
                 'time': [],
                 'volts': [],
                 'current': [],
@@ -1179,6 +1260,7 @@ class TestController:
 
         # Populate the datasetup dictionary with the retrieved data
         for row in result:
+            data['data_id'].append(row['data_id'])
             data['testtype'].append(row['testtype'])
             data['time'].append(row['time'])
             data['volts'].append(row['volts'])
