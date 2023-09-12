@@ -29,15 +29,21 @@ class showTest:
                 if i == 0:
                     continue
                 else:
+                    # these two lines do the same, the above one is clearer, the lower one is faster
+                    # these are just iterations through the current values, making the cumulative from the starting
+                    # point 'start'
                     # Filter['current'][i + start] = Filter['current'][i + start] + Filter['current'][i + start-1]
                     Filter.loc[i + start, 'current'] = Filter.loc[i + start, 'current'] + Filter.loc[i + start - 1, 'current']
 
             max = Filter['volts'].max()
             min = Filter['volts'].min()
-            corrVolts = 1-(max-Filter['volts'])/(max-min)
-            plt.plot(corrVolts,Filter['current'])
-            plt.ylabel('current')
-            plt.xlabel('goal voltage %')
+
+            # make a voltage path as a percentage of the lowest voltage towards the highest voltage of a test
+            scaledVolts = 1 - (max - Filter['volts']) / (max - min)
+            plt.plot(scaledVolts, Filter['current'])
+
+            plt.ylabel('Cumulative current (Amps)')
+            plt.xlabel('Voltage as a percentage of maximum test voltage (%)')
             title = Filter['testtype'][start]
             plt.title(f"Voltage path for {title}")
             plt.grid(True)
@@ -52,7 +58,7 @@ class showTest:
             plt.ylabel('volts')
             plt.xlabel('time')
             plt.legend()
-            plt.title(f"Voltage path for regular discharging/charging")
+            plt.title(f"Voltage path for discharging/charging")
             plt.grid(True)
             #plt.xlim(0, Filter['time'].max())
             #plt.ylim(0, Filter['volts'].max())

@@ -17,14 +17,35 @@ from sqlalchemy import create_engine
 
 # Class used to control test procedures
 class TestController:
+    """
+        This object is a wrapper for all tests and data gathering. It automatically stores information into the Alor-DB
+        and assigns it to the correct battery ID.
+
+        Args:
+                no arguments needed
+
+        Returns:
+                nothing, only sets internal functions
+        """
     # Initiating function
     def __init__(self):
+        """
+            initializer for the test object
+
+            Args:
+                no arguments needed
+
+            Returns:
+                nothing, only sets internal variables
+            """
         try:
             # Trying to connect to the real device controllers
             self.powerSupplyController = PowerSupplyController()
             print("Testcontroller succesfully connected to Power Supply")
             self.electronicLoadController = ElectronicLoadController()
             print("Testcontroller succesfully connected to Electronic Load")
+
+            # uncomment line below if multimeter will be used
             # self.multimeterController = MultimeterController()
             # print("Testcontroller succesfully connected to Multimeter")
         except:
@@ -33,7 +54,10 @@ class TestController:
             self.powerSupplyController = PowerSupplyControllerMock()
             self.electronicLoadController = ElectronicLoadControllerMock()
             self.multimeterController = MultimeterControllerMock()
-        # Indicates the number of seconds between each measurement
+            print("This connection should be successful unless your hardware is incorrectly set up")
+            raise ConnectionError
+            # Indicates the number of seconds between each measurement
+        # default waiting period between measurements
         self.timeInterval = 0.5
         # Variable for keeping track of the open circuit voltage of a full battery
         self.OCVFull = 0.0
@@ -41,10 +65,14 @@ class TestController:
         self.OCVEmpty = 0.0
         # Variable for keeping track of the C-rate of the battery
         self.C_rate = 0.0
+
         # Create an event to indicate if test is running
+        # this is legacy code for the older tests.
         self.event = threading.Event()
 
+        # what battery data is assigned to in the database. 0 will be the default and is a dummy battery.
         self.batteryID = 0
+        # this variable is a trigger, so that different threads can know if the panic button is pressed.
         self.breaker = False
 
     # Defining basic functionality of all remote devices through the device controller
@@ -139,8 +167,6 @@ class TestController:
     def getCCcurrentL1MAX(self):
         return self.electronicLoadController.getCCcurrentL1MAX()  # Read the maximum amp setting of Channel 1
 
-    ###### ###### á eftir að taka til fyrir neðan ###### ######
-
     def dischargeCC(self, amper):
         self.electronicLoadController.dischargeCC(amper)
 
@@ -151,18 +177,22 @@ class TestController:
         self.electronicLoadController.dischargeCP(watts)
 
     def getVoltageELC(self):
+        # returns load voltage
         x = self.electronicLoadController.getVoltage()
         return float(x)
 
     def getCurrentELC(self):
+        # returns load current
         x = self.electronicLoadController.getCurrent()
         return float(x)
 
     def getVoltagePSC(self):
+        # returns power supply voltage
         x = self.powerSupplyController.getVoltage()
         return float(x)
 
     def getCurrentPSC(self):
+        # returns power supply current
         x = self.powerSupplyController.getCurrent()
         return float(x)
 
@@ -171,12 +201,27 @@ class TestController:
 
     # Functions to read realtime VOLTAGE, CURRENT and POWER from the power supply
     def create_battery(self, **kwargs):
+        """
+        A function to create new batteries in the database with some attributes.
 
+        Args:
+            'attribute1' (str),
+            'attribute2' (str),
+            'attribute3' (str),
+            'attribute4' (str),
+            'attribute5' (str),
+            'date_made' (str)
+            these values are expected, but they are all handled if empty ( in any configuration)
+        Returns:
+            does not return anything. It internally sets what battery the object assigns test data to in the database.
+        """
         database = "Alor - DB"
         user = "postgres"
         password = "1234"
         port = 5432
         host = "localhost"
+
+        # data setup for database insertions
 
         data = {'attribute1': [],
                 'attribute2': [],
@@ -184,10 +229,13 @@ class TestController:
                 'attribute4': [],
                 'attribute5': [],
                 'date_made': []}
+
+        # handling of empty variables
         try:
             data["attribute1"].append(kwargs['attribute1'])
         except:
-            data["attribute1"].append("")
+            print('You need to have at least the first attribute')
+            raise ValueError
 
         try:
             data["attribute2"].append(kwargs['attribute2'])
@@ -215,6 +263,7 @@ class TestController:
             data["date_made"].append(str(datetime.today()))
 
 
+        # turn the data into dataframes
         DF = pd.DataFrame(data)
 
         # INSERT INTO public.battery_table(
@@ -230,18 +279,43 @@ class TestController:
         except:
             print("Data was not inserted into the sql server")
 
+        # close the connection to the database
         engine.dispose()
 
-
-        #self.set_battery(**kwargs)
-
     def set_battery(self, **kwargs):
+        """
+        A function to assign already existing batteries, if 'batteryID' is not provided then the user is prompted on the
+        available batteries that fulfill the criteria provided by the user.
+
+        Args:
+            'attribute1' (str),
+            'attribute2' (str),
+            'attribute3' (str),
+            'attribute4' (str),
+            'attribute5' (str),
+            'date_made' (str)
+            these values are expected to identify batteries, but they are all handled if empty ( in any configuration).
+
+            If a certain battery ID is given using the variable name 'batteryID' then that id will be assigned and the
+            prompts will not execute.
+        Returns:
+
+        Returns:
+            does not return anything. It internally sets what battery the object assigns test data to in the database.
+        """
         database = "Alor - DB"
         user = "postgres"
         password = "1234"
         port = 5432
         host = "localhost"
+        try:
+            # if the ID is provided then it is used.
+            self.batteryID = kwargs['batteryID']
+            return
+        except:
+            pass
 
+        # handling of empty variables
         try:
             attribute1 = '\''+ kwargs['attribute1'] + '\''
         except:
@@ -272,10 +346,10 @@ class TestController:
         except:
             date_made = 'NULL'
 
-
+        # database connection established
         engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
 
-        # Insert the DataFrame into the database table
+        # selecting all the batteries that fulfill the description provided by the user
         query = f'SELECT battery_id, date_made, attribute1, attribute2, attribute3, attribute4, attribute5 ' \
                 f'FROM public.battery_table ' \
                 f'where attribute1 = COALESCE({attribute1}, attribute1)  ' \
@@ -284,24 +358,30 @@ class TestController:
                 f'and attribute4 = COALESCE({attribute4}, attribute4)' \
                 f'and attribute5 = COALESCE({attribute5}, attribute5)' \
                 f'and date_made = COALESCE({date_made}, date_made)  '
+        # get the result
         result = engine.execute(query)
 
-        # Populate the datasetup dictionary with the retrieved data
+        # reformat the result
         result = result.all()
         if len(result) == 0:
-            print("There were no batteries compatible with your criteria")
+            print("There were no batteries compatible with your criteria, try again")
             print("Program ending")
             quit()
         elif len(result) == 1:
+            # the first result
             row = result[0]
             print('Only one battery is compatible with your criteria, it will be automatically assigned to the test object')
             print(f'The ID: {row[0]}, the date: {str(row[1])}, the attributes: {row[2]}-{row[3]}-{row[4]}-{row[5]}-{row[6]}')
+            # the first element of the first result is used.
             self.batteryID = int(row[0])
         else:
+            # many results found
             print("These are the batteries that are compatible with your criteria:")
             id_list = []
             for row in result:
+                # all id elements gathered in a list
                 id_list.append(row[0])
+
                 print(f'The ID: {row[0]}, the date: {str(row[1])}, the attributes: {row[2]}-{row[3]}-{row[4]}-{row[5]}-{row[6]}')
             while True:
                 print("which battery would you like to choose? (q to quit)")
@@ -317,40 +397,52 @@ class TestController:
                 else:
                     print("Incorrect battery id input, try again with a valid one from the following list:")
                     print(id_list)
-
-
-        '''
-            data['testtype'].append(row['testtype'])
-            data['time'].append(row['time'])
-            data['volts'].append(row['volts'])
-            data['current'].append(row['current'])
-            data['power'].append(row['power'])
-            data['c_rate'].append(row['c_rate'])
-            data['cycle_number'].append(row['cycle_number'])
-            data['date'].append(row['date'])
-        '''
+        # close the connection
         engine.dispose()
 
 
     def run(self, testType, **kwargs):
+        """
+        This function operates the threads that run the killswitch and the ongoing test. It runs the threads in parallel
+        and listens to the user input.
 
-        Charge_time = kwargs["Charge_time"]
-        DCharge_time = kwargs["DCharge_time"]
+        Args:
+            arguments needed depend on the test type being ran, this function is flexible.
+            These arguments are the minimum needed.
+
+            "DCharge_current_max" (str),
+            "Charge_power_max" (str),
+            "Slew_current" (str),
+            "Slew_volt" (str),
+            "Charge_current_max" (str),
+            "Charge_volt_end" (str),
+            "keep_data" (bool)
+
+        Returns:
+            dictionary:
+            with the following structure
+            data = {'testtype': [],
+                'data_id': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+        """
         DCharge_current_max = kwargs["DCharge_current_max"]
         Charge_power_max = kwargs["Charge_power_max"]
         Slew_current = kwargs["Slew_current"]
         Slew_volt = kwargs["Slew_volt"]
         Charge_current_max = kwargs["Charge_current_max"]
         Charge_volt_end = kwargs["Charge_volt_end"]
+        keep_data = kwargs["keep_data"]
 
         # Setting parameters and limits
         self.powerSupplyController.stopOutput()
         print(f"Stopping output from Power Supply")
-
-        #        self.powerSupplyController.setVoltage(Charge_Volt_start)
-        #        print(f"Set the initial voltage to {Charge_Volt_start}")
         print("===========================")
-        print(f"Charge time {Charge_time}")
         self.setVoltageLimMax((Charge_volt_end - 0.01))
         print(f"Set the final Charge voltage to {(Charge_volt_end - 0.01)}")
 
@@ -373,19 +465,15 @@ class TestController:
         print(f"Set the Charging Over Power Protection  {Charge_power_max}")
         print("===========================")
 
-        print(f"Discharge time {DCharge_time}")
         print(f"Max Discharge Current {DCharge_current_max}")
         print(f"Max allowable discharge current {self.getCCcurrentL1MAX()}")
         print("===========================")
 
+        # a switch to select what function to run
         if testType == "capacityTest":
             testRunner = self.capacityTest
         elif testType == "enduranceTest":
             testRunner = self.enduranceTest
-        elif testType == "NEWupsTest":
-            testRunner = self.NEWupsTest
-        elif testType == "upsTest":
-            testRunner = self.upsTest
         elif testType == "PhotoVoltaicTest":
             testRunner = self.PhotoVoltaicTest
         elif testType == "charging":
@@ -398,36 +486,41 @@ class TestController:
             testRunner = self.CC
         elif testType == "CV":
             testRunner = self.CV
-
         else:
             print("The testType chosen is not recognized")
             raise ValueError
 
-        class MyThread(threading.Thread):
+        class runnerThread(threading.Thread):
+            # class that inherits from the threading.Thread class, but adds a return functionality for our purposes
             def __init__(self, target, args=(), kwargs={}):
+                # pass on the arguments
                 super().__init__(target=target, args=args)
                 self._kwargs = kwargs
                 self._result = None
 
             def run(self):
+                # check if bogus target
                 if self._target is not None:
                     self._result = self._target(**self._kwargs)
 
             def result(self):
+                # crucial line for passing on the test results from the thread when terminated
                 return self._result
 
         def check_keyboard_input():
             while True:
-                if keyboard.is_pressed('left shift'):
+                # constantly checking if the specific key is pressed
+                trigger_key = 'left shift'
+                if keyboard.is_pressed(trigger_key):
                     print("Program stopped.")
                     self.breaker = True
                     break
                 if self.breaker:
+                    # if killswitch was activated elsewere, terminate this thread
                     break
 
-            # Create and start the threads
-
-        thread_runner = MyThread(target=testRunner, args=(), kwargs=kwargs)
+        # run the test
+        thread_runner = runnerThread(target=testRunner, args=(), kwargs=kwargs)
         thread_runner.start()
 
         # Start the keyboard input checking thread
@@ -437,14 +530,18 @@ class TestController:
         # Wait for the threads to finish
         thread_runner.join()
         thread_keyboard.join()
-        print("Closing the charging and discharging processes")
+
+        print("Closing the testing processes")
         self.stopPSOutput()
         self.stopDischarge()
         print("-- Closure successful --")
 
+        # store the data
         data = thread_runner.result()
 
-
+        # if user does not want to keep, only return the data
+        if not keep_data:
+            return data
 
         database = "Alor - DB"
         user = "postgres"
@@ -455,29 +552,42 @@ class TestController:
         # Create a database connection
         engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database}')
 
+        # handle the database serialization ourselves
+
         query = f"SELECT MAX(data_id) FROM public.data_table"
         query_result = engine.execute(query)
+
+        # get the result
         first_item = query_result.one()
+        # get the first element of the first result
         result = first_item[0]
+
+        # make the next data_id be one higher than the previous highest datapoint
         data['data_id'] = result + 1
         step = 0
         for row in data['data_id']:
+            # incrementally add 1 for each datapoint that will be added to the database
             data.loc[step, ('data_id')] = row + step
+
+            # slower way of doing this, but simpler
             #data['data_id'][step] = row + step
+
             step += 1
-        #print(data['data_id'])
 
         test = data[['data_id']].copy()
         test['battery_id'] = self.batteryID
         try:
+            # we are appending to the test_table, after the highest test_id value
             query = f"SELECT MAX(test_id) FROM public.test_table"
             query_result = engine.execute(query)
             first_item = query_result.one()
             result = first_item[0]
 
             if result is None:
+                # check for inconsistency in the data insertion process, this should not occur.
                 raise TypeError
         except:
+            # if database is empty
             result = 0
         test['test_id'] = result + 1
 
@@ -493,6 +603,34 @@ class TestController:
         return data
 
     def constantCurrentTest(self, **kwargs):
+        """
+        Charging to reach a certain voltage at a predetermined current
+        This is particularly useful because there is no time limit, the hardware
+        charges the batteries until the goal is reached, however long that takes.
+
+        Args:
+            Charge_Volt_start (float),
+            Charge_volt_end (float),
+            DCharge_volt_min (float),
+            DCharge_current_max (float),
+            Slew_current (float),
+            numCycles (int),
+            Goal_voltage (float),
+            c_rate (float),
+        Returns:
+            dataframe:
+            with the following structure
+            data = {'testtype': [],
+                'data_id': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+            pd.DataFrame(data)
+        """
 
         Charge_Volt_start = kwargs["Charge_Volt_start"]
         Charge_volt_end = kwargs["Charge_volt_end"]
@@ -502,7 +640,6 @@ class TestController:
         numCycles = kwargs["numCycles"]
         Goal_voltage = kwargs["Goal_voltage"]
         c_rate = kwargs["c_rate"]
-        Charge_current_max = kwargs["Charge_current_max"]
 
         datasetup = {'testtype': [],
                      'time': [],
@@ -617,10 +754,14 @@ class TestController:
                 loopDelta_C = c - before_current
                 loopDelta_V = v - before_voltage
                 change_string = "positive"
-                # a semi random correction, this is to prevent oscillating corrections
-                Correction = 0.03 * rand.uniform(0.5, 1)
 
-                if loopDelta_C > Slew_current or c > Charge_current_max:
+                # a semi random correction, this is to prevent oscillating corrections
+                # this can be tuned further
+                lower_bound = 0.015
+                upper_bound = 0.03
+                Correction = rand.uniform(lower_bound, upper_bound)
+
+                if loopDelta_C > Slew_current or c > c_rate:
                     # we're over the slew current rate or current rate so we need to step back the voltage a little bit
                     Correction *= -1
                     change_string = "negative"
@@ -674,6 +815,7 @@ class TestController:
 
     def constantVoltageTest(self, chargeTime: int, dischargeTime: int, waitTime: int, numCycles: int, CPar, temp: int,
                             **kwargs):
+        """ legacy code, not used currently. but not nececcary to delete """
         startTime = time.time()
         currentMeasurement = 1.0
         self.event.clear()
@@ -749,6 +891,7 @@ class TestController:
                 dataStorage.createTable("UPS Test", cParameter, cycleNumber, temp, self.timeInterval, chargeTime)
         # Set the event to indicate that testing is finished
     def PhotoVoltaicTest(self, waitTime: int, numCycles: int, CParCharge, CParDischarge, temp: int, **kwargs):
+        """ legacy code, not used currently. but not nececcary to delete """
         startTime = time.time()
         currentMeasurement = 1.0
         self.event.clear()
@@ -810,6 +953,7 @@ class TestController:
         self.event.set()
     # Test protocal for testing the capacity of a battery
     def capacityTest(self, chargeTime: int, waitTime: int, numCycles: int, CPar, temp: int):
+        """ legacy code, not used currently. but not nececcary to delete """
         # Clear event to indicate that test is currently running
         self.event.clear()
         # Create a loop that will run one time for each element of the eather CPar or TempPar
@@ -875,6 +1019,7 @@ class TestController:
         # Set the event to indicate that testing is done
         self.event.set()
     def enduranceTest(self, chargeTime: int, waitTime: int, numCycles: int, CPar, temp: int):
+        """ legacy code, not used currently. but not nececcary to delete """
         self.event.clear()
         # Create a loop that will run one time for each element of the eather CPar or TempPar
         for cParameter in CPar:
@@ -939,6 +1084,25 @@ class TestController:
         self.event.set()
 
     def CC(self, **kwargs):
+        """
+        A function to greet a person by name.
+
+        Args:
+            name (str): The name of the person to greet.
+
+        Returns:
+            dictionary:
+            with the following structure
+            data = {'testtype': [],
+                'data_id': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+        """
         Charge_Volt_start = kwargs["Charge_Volt_start"]
         numCycles = kwargs["numCycles"]
         c_rate = kwargs["c_rate"]
@@ -1048,6 +1212,25 @@ class TestController:
         return data
 
     def CV(self, **kwargs):
+        """
+        A function to greet a person by name.
+
+        Args:
+            name (str): The name of the person to greet.
+
+        Returns:
+            dictionary:
+            with the following structure
+            data = {'testtype': [],
+                'data_id': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+        """
         numCycles = kwargs["numCycles"]
         c_rate = kwargs["c_rate"]
         Charge_volt_end = kwargs["Charge_volt_end"]
@@ -1119,6 +1302,26 @@ class TestController:
         return data
 
     def charging(self, **kwargs):
+        """
+        A function to greet a person by name.
+
+        Args:
+            name (str): The name of the person to greet.
+
+        Returns:
+            dataframe:
+            with the following structure
+            data = {'testtype': [],
+                'data_id': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+            pd.DataFrame(data)
+        """
         Charge_Volt_start = kwargs["Charge_Volt_start"]
         numCycles = kwargs["numCycles"]
         c_rate = kwargs["c_rate"]
@@ -1229,8 +1432,29 @@ class TestController:
         return DF
 
     def getData(self, fromID=None, toID=None):
+        """
+        A function to greet a person by name.
+
+        Args:
+            name (str): The name of the person to greet.
+
+        Returns:
+            dataframe:
+            with the following structure
+            data = {'testtype': [],
+                'data_id': [],
+                'time': [],
+                'volts': [],
+                'current': [],
+                'power': [],
+                'c_rate': [],
+                'cycle_number': [],
+                'date': []}
+            pd.DataFrame(data)
+        """
         if fromID is None or toID is None or toID < fromID:
-            print("You need to identify the data you're trying to retrieve'")
+            print("You need to correctly identify the data you're trying to retrieve'")
+            print(f'the following are not valid, fromID:{fromID}, toID{toID}')
             raise ValueError
 
         from sqlalchemy import create_engine
